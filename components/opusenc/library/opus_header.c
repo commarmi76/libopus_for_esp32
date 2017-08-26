@@ -69,7 +69,7 @@ typedef struct {
    int pos;
 } ROPacket;
 
-static int write_uint32(Packet *p, ogg_uint32_t val)
+static int write_uint32(Packet *p, opus_uint32 val)
 {
    if (p->pos>p->maxlen-4)
       return 0;
@@ -81,7 +81,7 @@ static int write_uint32(Packet *p, ogg_uint32_t val)
    return 1;
 }
 
-static int write_uint16(Packet *p, ogg_uint16_t val)
+static int write_uint16(Packet *p, opus_uint16 val)
 {
    if (p->pos>p->maxlen-2)
       return 0;
@@ -98,121 +98,6 @@ static int write_chars(Packet *p, const unsigned char *str, int nb_chars)
       return 0;
    for (i=0;i<nb_chars;i++)
       p->data[p->pos++] = str[i];
-   return 1;
-}
-
-static int read_uint32(ROPacket *p, ogg_uint32_t *val)
-{
-   if (p->pos>p->maxlen-4)
-      return 0;
-   *val =  (ogg_uint32_t)p->data[p->pos  ];
-   *val |= (ogg_uint32_t)p->data[p->pos+1]<< 8;
-   *val |= (ogg_uint32_t)p->data[p->pos+2]<<16;
-   *val |= (ogg_uint32_t)p->data[p->pos+3]<<24;
-   p->pos += 4;
-   return 1;
-}
-
-static int read_uint16(ROPacket *p, ogg_uint16_t *val)
-{
-   if (p->pos>p->maxlen-2)
-      return 0;
-   *val =  (ogg_uint16_t)p->data[p->pos  ];
-   *val |= (ogg_uint16_t)p->data[p->pos+1]<<8;
-   p->pos += 2;
-   return 1;
-}
-
-static int read_chars(ROPacket *p, unsigned char *str, int nb_chars)
-{
-   int i;
-   if (p->pos>p->maxlen-nb_chars)
-      return 0;
-   for (i=0;i<nb_chars;i++)
-      str[i] = p->data[p->pos++];
-   return 1;
-}
-
-int opus_header_parse(const unsigned char *packet, int len, OpusHeader *h)
-{
-   int i;
-   char str[9];
-   ROPacket p;
-   unsigned char ch;
-   ogg_uint16_t shortval;
-
-   p.data = packet;
-   p.maxlen = len;
-   p.pos = 0;
-   str[8] = 0;
-   if (len<19)return 0;
-   read_chars(&p, (unsigned char*)str, 8);
-   if (memcmp(str, "OpusHead", 8)!=0)
-      return 0;
-
-   if (!read_chars(&p, &ch, 1))
-      return 0;
-   h->version = ch;
-   if((h->version&240) != 0) /* Only major version 0 supported. */
-      return 0;
-
-   if (!read_chars(&p, &ch, 1))
-      return 0;
-   h->channels = ch;
-   if (h->channels == 0)
-      return 0;
-
-   if (!read_uint16(&p, &shortval))
-      return 0;
-   h->preskip = shortval;
-
-   if (!read_uint32(&p, &h->input_sample_rate))
-      return 0;
-
-   if (!read_uint16(&p, &shortval))
-      return 0;
-   h->gain = (short)shortval;
-
-   if (!read_chars(&p, &ch, 1))
-      return 0;
-   h->channel_mapping = ch;
-
-   if (h->channel_mapping != 0)
-   {
-      if (!read_chars(&p, &ch, 1))
-         return 0;
-
-      if (ch<1)
-         return 0;
-      h->nb_streams = ch;
-
-      if (!read_chars(&p, &ch, 1))
-         return 0;
-
-      if (ch>h->nb_streams || (ch+h->nb_streams)>255)
-         return 0;
-      h->nb_coupled = ch;
-
-      /* Multi-stream support */
-      for (i=0;i<h->channels;i++)
-      {
-         if (!read_chars(&p, &h->stream_map[i], 1))
-            return 0;
-         if (h->stream_map[i]>(h->nb_streams+h->nb_coupled) && h->stream_map[i]!=255)
-            return 0;
-      }
-   } else {
-      if(h->channels>2)
-         return 0;
-      h->nb_streams = 1;
-      h->nb_coupled = h->channels>1;
-      h->stream_map[0]=0;
-      h->stream_map[1]=1;
-   }
-   /*For version 0/1 we know there won't be any more data
-     so reject any that have data past the end.*/
-   if ((h->version==0 || h->version==1) && p.pos != len)
-      return 0;
    return 1;
 }
 
@@ -270,6 +155,113 @@ int opus_header_to_packet(const OpusHeader *h, unsigned char *packet, int len)
 
    return p.pos;
 }
+
+/*
+ Comments will be stored in the Vorbis style.
+ It is described in the "Structure" section of
+    http://www.xiph.org/ogg/vorbis/doc/v-comment.html
+
+ However, Opus and other non-vorbis formats omit the "framing_bit".
+
+The comment header is decoded as follows:
+  1) [vendor_length] = read an unsigned integer of 32 bits
+  2) [vendor_string] = read a UTF-8 vector as [vendor_length] octets
+  3) [user_comment_list_length] = read an unsigned integer of 32 bits
+  4) iterate [user_comment_list_length] times {
+     5) [length] = read an unsigned integer of 32 bits
+     6) this iteration's user comment = read a UTF-8 vector as [length] octets
+     }
+  7) done.
+*/
+
+#define readint(buf, base) (((buf[base+3]<<24)&0xff000000)| \
+                           ((buf[base+2]<<16)&0xff0000)| \
+                           ((buf[base+1]<<8)&0xff00)| \
+                           (buf[base]&0xff))
+#define writeint(buf, base, val) do{ buf[base+3]=((val)>>24)&0xff; \
+                                     buf[base+2]=((val)>>16)&0xff; \
+                                     buf[base+1]=((val)>>8)&0xff; \
+                                     buf[base]=(val)&0xff; \
+                                 }while(0)
+
+void comment_init(char **comments, int* length, const char *vendor_string)
+{
+  /*The 'vendor' field should be the actual encoding library used.*/
+  int vendor_length=strlen(vendor_string);
+  int user_comment_list_length=0;
+  int len=8+4+vendor_length+4;
+  char *p=(char*)malloc(len);
+  if (p == NULL) return;
+  memcpy(p, "OpusTags", 8);
+  writeint(p, 8, vendor_length);
+  memcpy(p+12, vendor_string, vendor_length);
+  writeint(p, 12+vendor_length, user_comment_list_length);
+  *length=len;
+  *comments=p;
+}
+
+int comment_add(char **comments, int* length, const char *tag, const char *val)
+{
+  char* p=*comments;
+  int vendor_length=readint(p, 8);
+  int user_comment_list_length=readint(p, 8+4+vendor_length);
+  int tag_len=(tag?strlen(tag)+1:0);
+  int val_len=strlen(val);
+  int len=(*length)+4+tag_len+val_len;
+
+  p=(char*)realloc(p, len);
+  if (p == NULL) return 1;
+
+  writeint(p, *length, tag_len+val_len);      /* length of comment */
+  if(tag){
+    memcpy(p+*length+4, tag, tag_len);        /* comment tag */
+    (p+*length+4)[tag_len-1] = '=';           /* separator */
+  }
+  memcpy(p+*length+4+tag_len, val, val_len);  /* comment */
+  writeint(p, 8+4+vendor_length, user_comment_list_length+1);
+  *comments=p;
+  *length=len;
+  return 0;
+}
+
+void comment_pad(char **comments, int* length, int amount)
+{
+  if(amount>0){
+    int i;
+    int newlen;
+    char* p=*comments;
+    /*Make sure there is at least amount worth of padding free, and
+       round up to the maximum that fits in the current ogg segments.*/
+    newlen=(*length+amount+255)/255*255-1;
+    p=realloc(p,newlen);
+    if (p == NULL) return;
+    for(i=*length;i<newlen;i++)p[i]=0;
+    *comments=p;
+    *length=newlen;
+  }
+}
+
+int comment_replace_vendor_string(char **comments, int* length, const char *vendor_string)
+{
+  char* p=*comments;
+  int vendor_length;
+  int newlen;
+  int newvendor_length;
+  vendor_length=readint(p, 8);
+  newvendor_length=strlen(vendor_string);
+  newlen=*length+newvendor_length-vendor_length;
+  p=realloc(p, newlen);
+  if (p == NULL) return 1;
+  writeint(p, 8, newvendor_length);
+  memmove(p+12+newvendor_length, p+12+vendor_length, newlen-12-newvendor_length);
+  memcpy(p+12, vendor_string, newvendor_length);
+  *comments=p;
+  *length=newlen;
+  return 0;
+}
+#undef readint
+#undef writeint
+
 
 /* This is just here because it's a convenient file linked by both opusenc and
    opusdec (to guarantee this maps stays in sync). */
