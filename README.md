@@ -33,7 +33,7 @@ Using libopusenc from xiph and last idf framework (24/08/2017).
 
 Total time in microseconds: 23622539 microseconds
 
-So, great performance regression. :-(
+So, big performance regression. :-(
 
 =================================================================================
 
