@@ -45,7 +45,6 @@
 # else
 #  ifdef HAVE_ALLOCA_H
 #   include <alloca.h>
-#   include <stdlib.h>
 #  else
 #   include <stdlib.h>
 #  endif
@@ -107,7 +106,6 @@
 #  define ALLOC(var, size, type) var = ((type*)_alloca(sizeof(type)*(size)))
 # else
 #  define ALLOC(var, size, type) var = ((type*)alloca(sizeof(type)*(size)))
-#  define AESP32(var, size, type) var = ((type*)malloc(sizeof(type)*(size)))
 # endif
 
 #define SAVE_STACK
@@ -155,7 +153,7 @@ extern char *global_stack_top;
 
 #include "os_support.h"
 #define VARDECL(type, var) type *var
-//#define ALLOC(var, size, type) var = PUSH(global_stack, size, type)
+#define ALLOC(var, size, type) var = PUSH(global_stack, size, type)
 #define SAVE_STACK char *_saved_stack = global_stack;
 #define ALLOC_NONE 0
 

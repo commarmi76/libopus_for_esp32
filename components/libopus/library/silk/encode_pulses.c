@@ -92,7 +92,7 @@ void silk_encode_pulses(
     }
 
     /* Take the absolute value of the pulses */
-    AESP32( abs_pulses, iter * SHELL_CODEC_FRAME_LENGTH, opus_int );
+    ALLOC( abs_pulses, iter * SHELL_CODEC_FRAME_LENGTH, opus_int );
     silk_assert( !( SHELL_CODEC_FRAME_LENGTH & 3 ) );
     for( i = 0; i < iter * SHELL_CODEC_FRAME_LENGTH; i+=4 ) {
         abs_pulses[i+0] = ( opus_int )silk_abs( pulses[ i + 0 ] );
@@ -102,8 +102,8 @@ void silk_encode_pulses(
     }
 
     /* Calc sum pulses per shell code frame */
-    AESP32( sum_pulses, iter, opus_int );
-    AESP32( nRshifts, iter, opus_int );
+    ALLOC( sum_pulses, iter, opus_int );
+    ALLOC( nRshifts, iter, opus_int );
     abs_pulses_ptr = abs_pulses;
     for( i = 0; i < iter; i++ ) {
         nRshifts[ i ] = 0;
@@ -203,7 +203,4 @@ void silk_encode_pulses(
     /****************/
     silk_encode_signs( psRangeEnc, pulses, frame_length, signalType, quantOffsetType, sum_pulses );
     RESTORE_STACK;
-    free(abs_pulses);
-    free(sum_pulses);
-    free(nRshifts);
 }

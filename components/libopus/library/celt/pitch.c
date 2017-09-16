@@ -220,13 +220,8 @@ opus_val32
 #else
 void
 #endif
-#if defined(OVERRIDE_PITCH_XCORR)
 celt_pitch_xcorr_c(const opus_val16 *_x, const opus_val16 *_y,
-      opus_val32 *xcorr, int len, int max_pitch)
-#else
-celt_pitch_xcorr(const opus_val16 *_x, const opus_val16 *_y,
       opus_val32 *xcorr, int len, int max_pitch, int arch)
-#endif
 {
 
 #if 0 /* This is a simple version of the pitch correlation that should work
@@ -265,11 +260,7 @@ celt_pitch_xcorr(const opus_val16 *_x, const opus_val16 *_y,
    for (i=0;i<max_pitch-3;i+=4)
    {
       opus_val32 sum[4]={0,0,0,0};
-#if defined(OVERRIDE_PITCH_XCORR)
-      xcorr_kernel_c(_x, _y+i, sum, len);
-#else
       xcorr_kernel(_x, _y+i, sum, len, arch);
-#endif
       xcorr[i]=sum[0];
       xcorr[i+1]=sum[1];
       xcorr[i+2]=sum[2];
@@ -285,11 +276,7 @@ celt_pitch_xcorr(const opus_val16 *_x, const opus_val16 *_y,
    for (;i<max_pitch;i++)
    {
       opus_val32 sum;
-#if defined(OVERRIDE_PITCH_XCORR)
-      sum = celt_inner_prod_c(_x, _y+i, len);
-#else
       sum = celt_inner_prod(_x, _y+i, len, arch);
-#endif
       xcorr[i] = sum;
 #ifdef FIXED_POINT
       maxcorr = MAX32(maxcorr, sum);
@@ -323,9 +310,9 @@ void pitch_search(const opus_val16 * OPUS_RESTRICT x_lp, opus_val16 * OPUS_RESTR
    celt_assert(max_pitch>0);
    lag = len+max_pitch;
 
-   AESP32(x_lp4, len>>2, opus_val16);
-   AESP32(y_lp4, lag>>2, opus_val16);
-   AESP32(xcorr, max_pitch>>1, opus_val32);
+   ALLOC(x_lp4, len>>2, opus_val16);
+   ALLOC(y_lp4, lag>>2, opus_val16);
+   ALLOC(xcorr, max_pitch>>1, opus_val32);
 
    /* Downsample by 2 again */
    for (j=0;j<len>>2;j++)
@@ -378,7 +365,7 @@ void pitch_search(const opus_val16 * OPUS_RESTRICT x_lp, opus_val16 * OPUS_RESTR
       for (j=0;j<len>>1;j++)
          sum += SHR32(MULT16_16(x_lp[j],y[i+j]), shift);
 #else
-      sum = celt_inner_prod_c(x_lp, y+i, len>>1);
+      sum = celt_inner_prod(x_lp, y+i, len>>1, arch);
 #endif
       xcorr[i] = MAX32(-1, sum);
 #ifdef FIXED_POINT
@@ -409,9 +396,6 @@ void pitch_search(const opus_val16 * OPUS_RESTRICT x_lp, opus_val16 * OPUS_RESTR
    }
    *pitch = 2*best_pitch[0]-offset;
 
-   free(x_lp4);
-   free(y_lp4);
-   free(xcorr);
    RESTORE_STACK;
 }
 
@@ -427,7 +411,7 @@ static opus_val16 compute_pitch_gain(opus_val32 xy, opus_val32 xx, opus_val32 yy
    sx = celt_ilog2(xx)-14;
    sy = celt_ilog2(yy)-14;
    shift = sx + sy;
-   x2y2 = MULT16_16_Q14(VSHR32(xx, sx), VSHR32(yy, sy));
+   x2y2 = SHR32(MULT16_16(VSHR32(xx, sx), VSHR32(yy, sy)), 14);
    if (shift & 1) {
       if (x2y2 < 32768)
       {
@@ -476,7 +460,7 @@ opus_val16 remove_doubling(opus_val16 *x, int maxperiod, int minperiod,
       *T0_=maxperiod-1;
 
    T = T0 = *T0_;
-   AESP32(yy_lookup, maxperiod+1, opus_val32);
+   ALLOC(yy_lookup, maxperiod+1, opus_val32);
    dual_inner_prod(x, x, x-T0, N, &xx, &xy, arch);
    yy_lookup[0] = xx;
    yy=xx;
@@ -556,6 +540,5 @@ opus_val16 remove_doubling(opus_val16 *x, int maxperiod, int minperiod,
    if (*T0_<minperiod0)
       *T0_=minperiod0;
    RESTORE_STACK;
-   free(yy_lookup);
    return pg;
 }

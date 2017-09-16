@@ -124,7 +124,7 @@ void silk_CNG(
     /* Add CNG when packet is lost or during DTX */
     if( psDec->lossCnt ) {
         VARDECL( opus_int32, CNG_sig_Q14 );
-        AESP32( CNG_sig_Q14, length + MAX_LPC_ORDER, opus_int32 );
+        ALLOC( CNG_sig_Q14, length + MAX_LPC_ORDER, opus_int32 );
 
         /* Generate CNG excitation */
         gain_Q16 = silk_SMULWW( psDec->sPLC.randScale_Q14, psDec->sPLC.prevGain_Q16[1] );
@@ -138,11 +138,11 @@ void silk_CNG(
             gain_Q16 = silk_LSHIFT32( silk_SQRT_APPROX( gain_Q16 ), 8 );
         }
         gain_Q10 = silk_RSHIFT( gain_Q16, 6 );
-        
+
         silk_CNG_exc( CNG_sig_Q14 + MAX_LPC_ORDER, psCNG->CNG_exc_buf_Q14, length, &psCNG->rand_seed );
 
         /* Convert CNG NLSF to filter representation */
-        silk_NLSF2A( A_Q12, psCNG->CNG_smth_NLSF_Q15, psDec->LPC_order );
+        silk_NLSF2A( A_Q12, psCNG->CNG_smth_NLSF_Q15, psDec->LPC_order, psDec->arch );
 
         /* Generate CNG signal, by synthesis filtering */
         silk_memcpy( CNG_sig_Q14, psCNG->CNG_synth_state, MAX_LPC_ORDER * sizeof( opus_int32 ) );
@@ -170,14 +170,13 @@ void silk_CNG(
             }
 
             /* Update states */
-            CNG_sig_Q14[ MAX_LPC_ORDER + i ] = silk_ADD_LSHIFT( CNG_sig_Q14[ MAX_LPC_ORDER + i ], LPC_pred_Q10, 4 );
-            
+            CNG_sig_Q14[ MAX_LPC_ORDER + i ] = silk_ADD_SAT32( CNG_sig_Q14[ MAX_LPC_ORDER + i ], silk_LSHIFT_SAT32( LPC_pred_Q10, 4 ) );
+
             /* Scale with Gain and add to input signal */
             frame[ i ] = (opus_int16)silk_ADD_SAT16( frame[ i ], silk_SAT16( silk_RSHIFT_ROUND( silk_SMULWW( CNG_sig_Q14[ MAX_LPC_ORDER + i ], gain_Q10 ), 8 ) ) );
-            
+
         }
         silk_memcpy( psCNG->CNG_synth_state, &CNG_sig_Q14[ length ], MAX_LPC_ORDER * sizeof( opus_int32 ) );
-        free(CNG_sig_Q14);
     } else {
         silk_memset( psCNG->CNG_synth_state, 0, psDec->LPC_order *  sizeof( opus_int32 ) );
     }

@@ -260,7 +260,7 @@ opus_int silk_Decode(                                   /* O    Returns error co
        usage. We need to use a < and not a <= because of the two extra samples. */
     delay_stack_alloc = decControl->internalSampleRate*decControl->nChannelsInternal
           < decControl->API_sampleRate*decControl->nChannelsAPI;
-    AESP32( samplesOut1_tmp_storage1, delay_stack_alloc ? ALLOC_NONE
+    ALLOC( samplesOut1_tmp_storage1, delay_stack_alloc ? ALLOC_NONE
            : decControl->nChannelsInternal*(channel_state[ 0 ].frame_length + 2 ),
            opus_int16 );
     if ( delay_stack_alloc )
@@ -317,7 +317,7 @@ opus_int silk_Decode(                                   /* O    Returns error co
     *nSamplesOut = silk_DIV32( nSamplesOutDec * decControl->API_sampleRate, silk_SMULBB( channel_state[ 0 ].fs_kHz, 1000 ) );
 
     /* Set up pointers to temp buffers */
-    AESP32( samplesOut2_tmp,
+    ALLOC( samplesOut2_tmp,
            decControl->nChannelsAPI == 2 ? *nSamplesOut : ALLOC_NONE, opus_int16 );
     if( decControl->nChannelsAPI == 2 ) {
         resample_out_ptr = samplesOut2_tmp;
@@ -325,7 +325,7 @@ opus_int silk_Decode(                                   /* O    Returns error co
         resample_out_ptr = samplesOut;
     }
 
-    AESP32( samplesOut1_tmp_storage2, delay_stack_alloc
+    ALLOC( samplesOut1_tmp_storage2, delay_stack_alloc
            ? decControl->nChannelsInternal*(channel_state[ 0 ].frame_length + 2 )
            : ALLOC_NONE,
            opus_int16 );
@@ -381,9 +381,6 @@ opus_int silk_Decode(                                   /* O    Returns error co
        psDec->prev_decode_only_middle = decode_only_middle;
     }
     RESTORE_STACK;
-    free(samplesOut1_tmp_storage1);
-    free(samplesOut2_tmp);
-    free(samplesOut1_tmp_storage2);
     return ret;
 }
 

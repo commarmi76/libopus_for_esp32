@@ -295,8 +295,8 @@ void quant_coarse_energy(const CELTMode *m, int start, int end, int effEnd,
       max_decay = QCONST16(3.f,DB_SHIFT);
    enc_start_state = *enc;
 
-   AESP32(oldEBands_intra, C*m->nbEBands, opus_val16);
-   AESP32(error_intra, C*m->nbEBands, opus_val16);
+   ALLOC(oldEBands_intra, C*m->nbEBands, opus_val16);
+   ALLOC(error_intra, C*m->nbEBands, opus_val16);
    OPUS_COPY(oldEBands_intra, oldEBands, C*m->nbEBands);
 
    if (two_pass || intra)
@@ -326,7 +326,7 @@ void quant_coarse_energy(const CELTMode *m, int start, int end, int effEnd,
       save_bytes = nintra_bytes-nstart_bytes;
       if (save_bytes == 0)
          save_bytes = ALLOC_NONE;
-      AESP32(intra_bits, save_bytes, unsigned char);
+      ALLOC(intra_bits, save_bytes, unsigned char);
       /* Copy bits from intra bit-stream */
       OPUS_COPY(intra_bits, intra_buf, nintra_bytes - nstart_bytes);
 
@@ -344,7 +344,6 @@ void quant_coarse_energy(const CELTMode *m, int start, int end, int effEnd,
          OPUS_COPY(error, error_intra, C*m->nbEBands);
          intra = 1;
       }
-      free(intra_bits);
    } else {
       OPUS_COPY(oldEBands, oldEBands_intra, C*m->nbEBands);
       OPUS_COPY(error, error_intra, C*m->nbEBands);
@@ -357,8 +356,6 @@ void quant_coarse_energy(const CELTMode *m, int start, int end, int effEnd,
             new_distortion);
 
    RESTORE_STACK;
-   free(oldEBands_intra);
-   free(error_intra);
 }
 
 void quant_fine_energy(const CELTMode *m, int start, int end, opus_val16 *oldEBands, opus_val16 *error, int *fine_quant, ec_enc *enc, int C)
@@ -421,6 +418,7 @@ void quant_energy_finalise(const CELTMode *m, int start, int end, opus_val16 *ol
             offset = (q2-.5f)*(1<<(14-fine_quant[i]-1))*(1.f/16384);
 #endif
             oldEBands[i+c*m->nbEBands] += offset;
+            error[i+c*m->nbEBands] -= offset;
             bits_left--;
          } while (++c < C);
       }
@@ -550,9 +548,15 @@ void amp2Log2(const CELTMode *m, int effEnd, int end,
    c=0;
    do {
       for (i=0;i<effEnd;i++)
+      {
          bandLogE[i+c*m->nbEBands] =
-               celt_log2(SHL32(bandE[i+c*m->nbEBands],2))
+               celt_log2(bandE[i+c*m->nbEBands])
                - SHL16((opus_val16)eMeans[i],6);
+#ifdef FIXED_POINT
+         /* Compensate for bandE[] being Q12 but celt_log2() taking a Q14 input. */
+         bandLogE[i+c*m->nbEBands] += QCONST16(2.f, DB_SHIFT);
+#endif
+      }
       for (i=effEnd;i<end;i++)
          bandLogE[c*m->nbEBands+i] = -QCONST16(14.f,DB_SHIFT);
    } while (++c < C);

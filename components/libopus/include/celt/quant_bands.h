@@ -30,9 +30,9 @@
 #define QUANT_BANDS
 
 #include "arch.h"
-#include "entdec.h"
 #include "modes.h"
 #include "entenc.h"
+#include "entdec.h"
 #include "mathops.h"
 
 #ifdef FIXED_POINT

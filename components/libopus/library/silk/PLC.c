@@ -174,7 +174,7 @@ static OPUS_INLINE void silk_PLC_energy(opus_int32 *energy1, opus_int *shift1, o
     VARDECL( opus_int16, exc_buf );
     opus_int16 *exc_buf_ptr;
     SAVE_STACK;
-    AESP32( exc_buf, 2*subfr_length, opus_int16 );
+    ALLOC( exc_buf, 2*subfr_length, opus_int16 );
     /* Find random noise component */
     /* Scale previous excitation signal */
     exc_buf_ptr = exc_buf;
@@ -189,7 +189,6 @@ static OPUS_INLINE void silk_PLC_energy(opus_int32 *energy1, opus_int *shift1, o
     silk_sum_sqr_shift( energy1, shift1, exc_buf,                  subfr_length );
     silk_sum_sqr_shift( energy2, shift2, &exc_buf[ subfr_length ], subfr_length );
     RESTORE_STACK;
-    free(exc_buf);
 }
 
 static OPUS_INLINE void silk_PLC_conceal(
@@ -218,12 +217,12 @@ static OPUS_INLINE void silk_PLC_conceal(
     opus_int32 prevGain_Q10[2];
     SAVE_STACK;
 
-    AESP32( sLTP_Q14, psDec->ltp_mem_length + psDec->frame_length, opus_int32 );
+    ALLOC( sLTP_Q14, psDec->ltp_mem_length + psDec->frame_length, opus_int32 );
 #ifdef SMALL_FOOTPRINT
     /* Ugly hack that breaks aliasing rules to save stack: put sLTP at the very end of sLTP_Q14. */
     sLTP = ((opus_int16*)&sLTP_Q14[psDec->ltp_mem_length + psDec->frame_length])-psDec->ltp_mem_length;
 #else
-    AESP32( sLTP, psDec->ltp_mem_length, opus_int16 );
+    ALLOC( sLTP, psDec->ltp_mem_length, opus_int16 );
 #endif
 
     prevGain_Q10[0] = silk_RSHIFT( psPLC->prevGain_Q16[ 0 ], 6);
@@ -276,7 +275,7 @@ static OPUS_INLINE void silk_PLC_conceal(
             /* Reduce random noise for unvoiced frames with high LPC gain */
             opus_int32 invGain_Q30, down_scale_Q30;
 
-            invGain_Q30 = silk_LPC_inverse_pred_gain( psPLC->prevLPC_Q12, psDec->LPC_order );
+            invGain_Q30 = silk_LPC_inverse_pred_gain( psPLC->prevLPC_Q12, psDec->LPC_order, arch );
 
             down_scale_Q30 = silk_min_32( silk_RSHIFT( (opus_int32)1 << 30, LOG2_INV_LPC_GAIN_HIGH_THRES ), invGain_Q30 );
             down_scale_Q30 = silk_max_32( silk_RSHIFT( (opus_int32)1 << 30, LOG2_INV_LPC_GAIN_LOW_THRES ), down_scale_Q30 );
@@ -329,8 +328,10 @@ static OPUS_INLINE void silk_PLC_conceal(
         for( j = 0; j < LTP_ORDER; j++ ) {
             B_Q14[ j ] = silk_RSHIFT( silk_SMULBB( harm_Gain_Q15, B_Q14[ j ] ), 15 );
         }
-        /* Gradually reduce excitation gain */
-        rand_scale_Q14 = silk_RSHIFT( silk_SMULBB( rand_scale_Q14, rand_Gain_Q15 ), 15 );
+        if ( psDec->indices.signalType != TYPE_NO_VOICE_ACTIVITY ) {
+            /* Gradually reduce excitation gain */
+            rand_scale_Q14 = silk_RSHIFT( silk_SMULBB( rand_scale_Q14, rand_Gain_Q15 ), 15 );
+        }
 
         /* Slowly increase pitch lag */
         psPLC->pitchL_Q8 = silk_SMLAWB( psPLC->pitchL_Q8, psPLC->pitchL_Q8, PITCH_DRIFT_FAC_Q16 );
@@ -385,10 +386,6 @@ static OPUS_INLINE void silk_PLC_conceal(
         psDecCtrl->pitchL[ i ] = lag;
     }
     RESTORE_STACK;
-    free(sLTP_Q14);
-#ifndef SMALL_FOOTPRINT
-    free(sLTP);
-#endif
 }
 
 /* Glues concealed frames with new good received frames */

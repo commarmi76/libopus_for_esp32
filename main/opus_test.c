@@ -18,7 +18,7 @@
 extern const uint8_t Sample16kHz_raw_start[] asm("_binary_Sample16kHz_raw_start");
 extern const uint8_t Sample16kHz_raw_end[]   asm("_binary_Sample16kHz_raw_end");
 
-#define READ_SIZE 256
+#define READ_SIZE 512
 //#define FRAME_SIZE 960
 #define SAMPLE_RATE 16000
 #define CHANNELS 2
@@ -37,7 +37,11 @@ void opus_test()
 	  int num_samples_encoded = 0, total=0, frames=0;
 	  struct timeval tvalBefore, tvalFirstFrame, tvalAfter;
       unsigned char *page;
-      int len; 
+      int len;
+
+      free8start=heap_caps_get_free_size(MALLOC_CAP_8BIT);
+      free32start=heap_caps_get_free_size(MALLOC_CAP_32BIT);
+      printf("pre opus_create() free mem8bit: %d mem32bit: %d\n",free8start,free32start);
 
 	  pcm_samples = (short int *)Sample16kHz_raw_start;
 	  pcm_samples_end = (short int *)Sample16kHz_raw_end;
@@ -53,6 +57,10 @@ void opus_test()
            fprintf(stderr, "cannout open output file\n");
            return ; }
 
+      ope_encoder_ctl(enc,OPUS_SET_VBR_REQUEST,1);
+      ope_encoder_ctl(enc,OPUS_SET_BITRATE_REQUEST,64000);
+//      ope_encoder_ctl(enc,OPUS_SET_COMPLEXITY_REQUEST,5);
+
 		gettimeofday (&tvalBefore, NULL);
  while ( pcm_samples_end - pcm_samples > 0)
 		   //for (int j=0;j<1;j++)
@@ -64,7 +72,7 @@ void opus_test()
 
               while ( ope_encoder_get_page(enc, &page, &len, 0) )
                 {
-		         //for(int i = 0; i < len; i++) printf("%02X", page[i]);
+//		         for(int i = 0; i < len; i++) printf("%02X", page[i]);
 		         frames++;
                 }
 
@@ -93,7 +101,17 @@ void opus_test()
 		  #endif
 		   }
 
+              while ( ope_encoder_get_page(enc, &page, &len, 1) )
+                {
+//		         for(int i = 0; i < len; i++) printf("%02X", page[i]);
+                 frames++;
+                }
+
 		   gettimeofday (&tvalAfter, NULL);
+
+      free8start=heap_caps_get_free_size(MALLOC_CAP_8BIT);
+      free32start=heap_caps_get_free_size(MALLOC_CAP_32BIT);
+      printf("post encode free mem8bit: %d mem32bit: %d\n",free8start,free32start);
 
 		   printf("Fist Frame time in microseconds: %ld microseconds\n",
 		               ((tvalFirstFrame.tv_sec - tvalBefore.tv_sec)*1000000L

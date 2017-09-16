@@ -156,7 +156,7 @@ void silk_resampler_private_down_FIR(
     const opus_int16 *FIR_Coefs;
     SAVE_STACK;
 
-    AESP32( buf, S->batchSize + S->FIR_Order, opus_int32 );
+    ALLOC( buf, S->batchSize + S->FIR_Order, opus_int32 );
 
     /* Copy buffered samples to start of buffer */
     silk_memcpy( buf, S->sFIR.i32, S->FIR_Order * sizeof( opus_int32 ) );
@@ -191,5 +191,4 @@ void silk_resampler_private_down_FIR(
     /* Copy last part of filtered signal to the state for the next call */
     silk_memcpy( S->sFIR.i32, &buf[ nSamplesIn ], S->FIR_Order * sizeof( opus_int32 ) );
     RESTORE_STACK;
-    free(buf);
 }

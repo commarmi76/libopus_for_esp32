@@ -32,7 +32,7 @@
 #include <stddef.h>
 #include "os_support.h"
 #include "arch.h"
-#include "../../include/celt/entdec.h"
+#include "entdec.h"
 #include "mfrngcod.h"
 
 /*A range decoder.

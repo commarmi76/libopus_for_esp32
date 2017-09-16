@@ -53,13 +53,11 @@
 #define LPC_GOERTZEL_CONST 1.99931465f
 
 /* Allow up to 2 seconds for delayed decision. */
-//#define MAX_LOOKAHEAD 96000
+#define MAX_LOOKAHEAD 0
 /* We can't have a circular buffer (because of delayed decision), so let's not copy too often. */
-//#define BUFFER_EXTRA 24000
+#define BUFFER_EXTRA 4000
 
-//#define BUFFER_SAMPLES (MAX_LOOKAHEAD + BUFFER_EXTRA)
-
-#define BUFFER_SAMPLES 8000
+#define BUFFER_SAMPLES (MAX_LOOKAHEAD + BUFFER_EXTRA)
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
@@ -167,7 +165,7 @@ struct OggOpusEnc {
   int pull_api;
   int rate;
   int channels;
-  float *buffer;
+  opus_int16 *buffer;
   int buffer_start;
   int buffer_end;
   SpeexResamplerState *re;
@@ -332,7 +330,7 @@ OggOpusEnc *ope_encoder_create_callbacks(const OpusEncCallbacks *callbacks, void
   if ( (enc->buffer = malloc(sizeof(*enc->buffer)*BUFFER_SAMPLES*channels)) == NULL) goto fail;
   enc->buffer_start = enc->buffer_end = 0;
   enc->st = st;
-  if(callbacks != NULL) enc->callbacks = *callbacks; //enc->callbacks = *callbacks;
+  if (callbacks != NULL) enc->callbacks = *callbacks;
   enc->streams->user_data = user_data;
   if (error) *error = OPE_OK;
   return enc;
@@ -423,7 +421,7 @@ static void encode_buffer(OggOpusEnc *enc) {
       is_keyframe = 1;
     }
     packet = oggp_get_packet_buffer(enc->oggp, max_packet_size);
-    nbBytes = opus_multistream_encode_float(enc->st, &enc->buffer[enc->channels*enc->buffer_start],
+    nbBytes = opus_multistream_encode(enc->st, &enc->buffer[enc->channels*enc->buffer_start],
         enc->buffer_end-enc->buffer_start, packet, max_packet_size);
     if (nbBytes < 0) {
       /* Anything better we can do here? */
@@ -508,6 +506,7 @@ static void encode_buffer(OggOpusEnc *enc) {
 }
 
 /* Add/encode any number of float samples to the file. */
+/*
 int ope_encoder_write_float(OggOpusEnc *enc, const float *pcm, int samples_per_channel) {
   int channels = enc->channels;
   if (enc->unrecoverable) return OPE_UNRECOVERABLE;
@@ -539,7 +538,7 @@ int ope_encoder_write_float(OggOpusEnc *enc, const float *pcm, int samples_per_c
   } while (samples_per_channel > 0);
   return OPE_OK;
 }
-
+*/
 #define CONVERT_BUFFER 4096
 
 /* Add/encode any number of int16 samples to the file. */
@@ -556,12 +555,12 @@ int ope_encoder_write(OggOpusEnc *enc, const opus_int16 *pcm, int samples_per_ch
     spx_uint32_t in_samples, out_samples;
     out_samples = BUFFER_SAMPLES-enc->buffer_end;
     if (enc->re != NULL) {
-      float buf[CONVERT_BUFFER];
+ //     float buf[CONVERT_BUFFER];
       in_samples = MIN(CONVERT_BUFFER/channels, samples_per_channel);
-      for (i=0;i<channels*(int)in_samples;i++) {
+ /*     for (i=0;i<channels*(int)in_samples;i++) {
         buf[i] = (1.f/32768)*pcm[i];
-      }
-      speex_resampler_process_interleaved_float(enc->re, buf, &in_samples, &enc->buffer[channels*enc->buffer_end], &out_samples);
+      }*/
+      speex_resampler_process_interleaved_int(enc->re, pcm , &in_samples, &enc->buffer[channels*enc->buffer_end], &out_samples);
     } else {
       int curr;
       curr = MIN((spx_uint32_t)samples_per_channel, out_samples);
@@ -589,28 +588,6 @@ OPE_EXPORT int ope_encoder_get_page(OggOpusEnc *enc, unsigned char **page, opus_
   }
 }
 
-static void extend_signal(float *x, int before, int after, int channels);
-
-int ope_encoder_drain(OggOpusEnc *enc) {
-  int pad_samples;
-  if (enc->unrecoverable) return OPE_UNRECOVERABLE;
-  /* Check if it's already been drained. */
-  if (enc->streams == NULL) return OPE_TOO_LATE;
-  pad_samples = MAX(LPC_PADDING, enc->global_granule_offset + enc->frame_size);
-  if (!enc->streams->stream_is_init) init_stream(enc);
-  shift_buffer(enc);
-  assert(enc->buffer_end + pad_samples <= BUFFER_SAMPLES);
-  memset(&enc->buffer[enc->channels*enc->buffer_end], 0, pad_samples*enc->channels*sizeof(enc->buffer[0]));
-  extend_signal(&enc->buffer[enc->channels*enc->buffer_end], enc->buffer_end, LPC_PADDING, enc->channels);
-  enc->decision_delay = 0;
-  enc->buffer_end += pad_samples;
-  assert(enc->buffer_end <= BUFFER_SAMPLES);
-  encode_buffer(enc);
-  if (enc->unrecoverable) return OPE_UNRECOVERABLE;
-  /* Draining should have called all the streams to complete. */
-  assert(enc->streams == NULL);
-  return OPE_OK;
-}
 
 void ope_encoder_destroy(OggOpusEnc *enc) {
   EncStream *stream;
@@ -898,148 +875,5 @@ const char *ope_get_version_string(void)
 
 int ope_get_abi_version(void) {
   return OPE_ABI_VERSION;
-}
-
-static void vorbis_lpc_from_data(float *data, float *lpci, int n, int stride);
-
-static void extend_signal(float *x, int before, int after, int channels) {
-  int c;
-  int i;
-  float window[LPC_PADDING];
-  if (after==0) return;
-  before = MIN(before, LPC_INPUT);
-  if (before < 4*LPC_ORDER) {
-    int i;
-    for (i=0;i<after*channels;i++) x[i] = 0;
-    return;
-  }
-  {
-    /* Generate Window using a resonating IIR aka Goertzel's algorithm. */
-    float m0=1, m1=.5*LPC_GOERTZEL_CONST;
-    float a1 = LPC_GOERTZEL_CONST;
-    window[0] = 1;
-    for (i=1;i<LPC_PADDING;i++) {
-      window[i] = a1*m0 - m1;
-      m1 = m0;
-      m0 = window[i];
-    }
-    for (i=0;i<LPC_PADDING;i++) window[i] = .5+.5*window[i];
-  }
-  for (c=0;c<channels;c++) {
-    float lpc[LPC_ORDER];
-    vorbis_lpc_from_data(x-channels*before+c, lpc, before, channels);
-    for (i=0;i<after;i++) {
-      float sum;
-      int j;
-      sum = 0;
-      for (j=0;j<LPC_ORDER;j++) sum -= x[(i-j-1)*channels + c]*lpc[j];
-      x[i*channels + c] = sum;
-    }
-    for (i=0;i<after;i++) x[i*channels + c] *= window[i];
-  }
-}
-
-/* Some of these routines (autocorrelator, LPC coefficient estimator)
-   are derived from code written by Jutta Degener and Carsten Bormann;
-   thus we include their copyright below.  The entirety of this file
-   is freely redistributable on the condition that both of these
-   copyright notices are preserved without modification.  */
-
-/* Preserved Copyright: *********************************************/
-
-/* Copyright 1992, 1993, 1994 by Jutta Degener and Carsten Bormann,
-Technische Universita"t Berlin
-
-Any use of this software is permitted provided that this notice is not
-removed and that neither the authors nor the Technische Universita"t
-Berlin are deemed to have made any representations as to the
-suitability of this software for any purpose nor are held responsible
-for any defects of this software. THERE IS ABSOLUTELY NO WARRANTY FOR
-THIS SOFTWARE.
-
-As a matter of courtesy, the authors request to be informed about uses
-this software has found, about bugs in this software, and about any
-improvements that may be of general interest.
-
-Berlin, 28.11.1994
-Jutta Degener
-Carsten Bormann
-
-*********************************************************************/
-
-static void vorbis_lpc_from_data(float *data, float *lpci, int n, int stride) {
-  double aut[LPC_ORDER+1];
-  double lpc[LPC_ORDER];
-  double error;
-  double epsilon;
-  int i,j;
-
-  /* FIXME: Apply a window to the input. */
-  /* autocorrelation, p+1 lag coefficients */
-  j=LPC_ORDER+1;
-  while(j--){
-    double d=0; /* double needed for accumulator depth */
-    for(i=j;i<n;i++)d+=(double)data[i*stride]*data[(i-j)*stride];
-    aut[j]=d;
-  }
-
-  /* Apply lag windowing (better than bandwidth expansion) */
-  if (LPC_ORDER <= 64) {
-    for (i=1;i<=LPC_ORDER;i++) {
-      /* Approximate this gaussian for low enough order. */
-      /* aut[i] *= exp(-.5*(2*M_PI*.002*i)*(2*M_PI*.002*i));*/
-      aut[i] -= aut[i]*(0.008f*0.008f)*i*i;
-    }
-  }
-  /* Generate lpc coefficients from autocorr values */
-
-  /* set our noise floor to about -100dB */
-  error=aut[0] * (1. + 1e-7);
-  epsilon=1e-6*aut[0]+1e-7;
-
-  for(i=0;i<LPC_ORDER;i++){
-    double r= -aut[i+1];
-
-    if(error<epsilon){
-      memset(lpc+i,0,(LPC_ORDER-i)*sizeof(*lpc));
-      goto done;
-    }
-
-    /* Sum up this iteration's reflection coefficient; note that in
-       Vorbis we don't save it.  If anyone wants to recycle this code
-       and needs reflection coefficients, save the results of 'r' from
-       each iteration. */
-
-    for(j=0;j<i;j++)r-=lpc[j]*aut[i-j];
-    r/=error;
-
-    /* Update LPC coefficients and total error */
-
-    lpc[i]=r;
-    for(j=0;j<i/2;j++){
-      double tmp=lpc[j];
-
-      lpc[j]+=r*lpc[i-1-j];
-      lpc[i-1-j]+=r*tmp;
-    }
-    if(i&1)lpc[j]+=lpc[j]*r;
-
-    error*=1.-r*r;
-
-  }
-
- done:
-
-  /* slightly damp the filter */
-  {
-    double g = .999;
-    double damp = g;
-    for(j=0;j<LPC_ORDER;j++){
-      lpc[j]*=damp;
-      damp*=g;
-    }
-  }
-
-  for(j=0;j<LPC_ORDER;j++)lpci[j]=(float)lpc[j];
 }
 

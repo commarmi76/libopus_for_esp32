@@ -33,9 +33,9 @@
 #include "opus_types.h"
 #include "celt.h"
 #include "arch.h"
-#include "entdec.h"
 #include "mdct.h"
 #include "entenc.h"
+#include "entdec.h"
 
 #define MAX_PERIOD 1024
 

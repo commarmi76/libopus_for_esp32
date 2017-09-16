@@ -204,7 +204,7 @@ static int opus_multistream_decode_native(
    /* Limit frame_size to avoid excessive stack allocations. */
    opus_multistream_decoder_ctl(st, OPUS_GET_SAMPLE_RATE(&Fs));
    frame_size = IMIN(frame_size, Fs/25*3);
-   AESP32(buf, 2*frame_size, opus_val16);
+   ALLOC(buf, 2*frame_size, opus_val16);
    ptr = (char*)st + align(sizeof(OpusMSDecoder));
    coupled_size = opus_decoder_get_size(2);
    mono_size = opus_decoder_get_size(1);
@@ -214,13 +214,11 @@ static int opus_multistream_decode_native(
    if (len < 0)
    {
       RESTORE_STACK;
-      free(buf);
       return OPUS_BAD_ARG;
    }
    if (!do_plc && len < 2*st->layout.nb_streams-1)
    {
       RESTORE_STACK;
-      free(buf);
       return OPUS_INVALID_PACKET;
    }
    if (!do_plc)
@@ -229,19 +227,18 @@ static int opus_multistream_decode_native(
       if (ret < 0)
       {
          RESTORE_STACK;
-         free(buf);
          return ret;
       } else if (ret > frame_size)
       {
          RESTORE_STACK;
-         free(buf);
          return OPUS_BUFFER_TOO_SMALL;
       }
    }
    for (s=0;s<st->layout.nb_streams;s++)
    {
       OpusDecoder *dec;
-      int packet_offset, ret;
+      opus_int32 packet_offset;
+      int ret;
 
       dec = (OpusDecoder*)ptr;
       ptr += (s < st->layout.nb_coupled_streams) ? align(coupled_size) : align(mono_size);
@@ -249,7 +246,6 @@ static int opus_multistream_decode_native(
       if (!do_plc && len<=0)
       {
          RESTORE_STACK;
-         free(buf);
          return OPUS_INTERNAL_ERROR;
       }
       packet_offset = 0;
@@ -259,7 +255,6 @@ static int opus_multistream_decode_native(
       if (ret <= 0)
       {
          RESTORE_STACK;
-         free(buf);
          return ret;
       }
       frame_size = ret;
@@ -304,7 +299,6 @@ static int opus_multistream_decode_native(
       }
    }
    RESTORE_STACK;
-   free(buf);
    return frame_size;
 }
 
@@ -432,6 +426,7 @@ int opus_multistream_decoder_ctl(OpusMSDecoder *st, int request, ...)
        case OPUS_GET_SAMPLE_RATE_REQUEST:
        case OPUS_GET_GAIN_REQUEST:
        case OPUS_GET_LAST_PACKET_DURATION_REQUEST:
+       case OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST:
        {
           OpusDecoder *dec;
           /* For int32* GET params, just query the first stream */
@@ -506,6 +501,7 @@ int opus_multistream_decoder_ctl(OpusMSDecoder *st, int request, ...)
        }
        break;
        case OPUS_SET_GAIN_REQUEST:
+       case OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST:
        {
           int s;
           /* This works for int32 params */

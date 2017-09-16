@@ -51,7 +51,7 @@ opus_int silk_decode_frame(
     SAVE_STACK;
 
     L = psDec->frame_length;
-    AESP32( psDecCtrl, 1, silk_decoder_control );
+    ALLOC( psDecCtrl, 1, silk_decoder_control );
     psDecCtrl->LTP_scale_Q14 = 0;
 
     /* Safety checks */
@@ -61,7 +61,7 @@ opus_int silk_decode_frame(
         ( lostFlag == FLAG_DECODE_LBRR && psDec->LBRR_flags[ psDec->nFramesDecoded ] == 1 ) )
     {
         VARDECL( opus_int16, pulses );
-        AESP32( pulses, (L + SHELL_CODEC_FRAME_LENGTH - 1) &
+        ALLOC( pulses, (L + SHELL_CODEC_FRAME_LENGTH - 1) &
                        ~(SHELL_CODEC_FRAME_LENGTH - 1), opus_int16 );
         /*********************************************/
         /* Decode quantization indices of side info  */
@@ -95,9 +95,9 @@ opus_int silk_decode_frame(
 
         /* A frame has been decoded without errors */
         psDec->first_frame_after_reset = 0;
-        free(pulses);
     } else {
         /* Handle packet loss by extrapolation */
+        psDec->indices.signalType = psDec->prevSignalType;
         silk_PLC( psDec, psDecCtrl, pOut, 1, arch );
     }
 
@@ -126,6 +126,5 @@ opus_int silk_decode_frame(
     *pN = L;
 
     RESTORE_STACK;
-    free(psDecCtrl);
     return ret;
 }

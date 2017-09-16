@@ -58,7 +58,7 @@ void silk_stereo_LR_to_MS(
     opus_int16 *mid = &x1[ -2 ];
     SAVE_STACK;
 
-    AESP32( side, frame_length + 2, opus_int16 );
+    ALLOC( side, frame_length + 2, opus_int16 );
     /* Convert to basic mid/side signals */
     for( n = 0; n < frame_length + 2; n++ ) {
         sum  = x1[ n - 2 ] + (opus_int32)x2[ n - 2 ];
@@ -74,8 +74,8 @@ void silk_stereo_LR_to_MS(
     silk_memcpy( state->sSide, &side[ frame_length ], 2 * sizeof( opus_int16 ) );
 
     /* LP and HP filter mid signal */
-    AESP32( LP_mid, frame_length, opus_int16 );
-    AESP32( HP_mid, frame_length, opus_int16 );
+    ALLOC( LP_mid, frame_length, opus_int16 );
+    ALLOC( HP_mid, frame_length, opus_int16 );
     for( n = 0; n < frame_length; n++ ) {
         sum = silk_RSHIFT_ROUND( silk_ADD_LSHIFT( mid[ n ] + (opus_int32)mid[ n + 2 ], mid[ n + 1 ], 1 ), 2 );
         LP_mid[ n ] = sum;
@@ -83,8 +83,8 @@ void silk_stereo_LR_to_MS(
     }
 
     /* LP and HP filter side signal */
-    AESP32( LP_side, frame_length, opus_int16 );
-    AESP32( HP_side, frame_length, opus_int16 );
+    ALLOC( LP_side, frame_length, opus_int16 );
+    ALLOC( HP_side, frame_length, opus_int16 );
     for( n = 0; n < frame_length; n++ ) {
         sum = silk_RSHIFT_ROUND( silk_ADD_LSHIFT( side[ n ] + (opus_int32)side[ n + 2 ], side[ n + 1 ], 1 ), 2 );
         LP_side[ n ] = sum;
@@ -226,9 +226,4 @@ void silk_stereo_LR_to_MS(
     state->pred_prev_Q13[ 1 ] = (opus_int16)pred_Q13[ 1 ];
     state->width_prev_Q14     = (opus_int16)width_Q14;
     RESTORE_STACK;
-    free(side);
-    free(LP_mid);
-    free(HP_mid);
-    free(LP_side);
-    free(HP_side);
 }

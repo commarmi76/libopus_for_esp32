@@ -348,12 +348,17 @@ static OPUS_INLINE int interp_bits2pulses(const CELTMode *m, int start, int end,
             /*This if() block is the only part of the allocation function that
                is not a mandatory part of the bitstream: any bands we choose to
                skip here must be explicitly signaled.*/
-            /*Choose a threshold with some hysteresis to keep bands from
-               fluctuating in and out.*/
+            int depth_threshold;
+            /*We choose a threshold with some hysteresis to keep bands from
+               fluctuating in and out, but we try not to fold below a certain point. */
+            if (codedBands > 17)
+               depth_threshold = j<prev ? 7 : 9;
+            else
+               depth_threshold = 0;
 #ifdef FUZZING
             if ((rand()&0x1) == 0)
 #else
-            if (codedBands<=start+2 || (band_bits > ((j<prev?7:9)*band_width<<LM<<BITRES)>>4 && j<=signalBandwidth))
+            if (codedBands<=start+2 || (band_bits > (depth_threshold*band_width<<LM<<BITRES)>>4 && j<=signalBandwidth))
 #endif
             {
                ec_enc_bit_logp(ec, 1, 1);
@@ -559,10 +564,10 @@ int compute_allocation(const CELTMode *m, int start, int end, const int *offsets
          total -= dual_stereo_rsv;
       }
    }
-   AESP32(bits1, len, int);
-   AESP32(bits2, len, int);
-   AESP32(thresh, len, int);
-   AESP32(trim_offset, len, int);
+   ALLOC(bits1, len, int);
+   ALLOC(bits2, len, int);
+   ALLOC(thresh, len, int);
+   ALLOC(trim_offset, len, int);
 
    for (j=start;j<end;j++)
    {
@@ -634,11 +639,6 @@ int compute_allocation(const CELTMode *m, int start, int end, const int *offsets
          total, balance, skip_rsv, intensity, intensity_rsv, dual_stereo, dual_stereo_rsv,
          pulses, ebits, fine_priority, C, LM, ec, encode, prev, signalBandwidth);
    RESTORE_STACK;
-   free(bits1);
-   free(bits2);
-   free(thresh);
-   free(trim_offset);
-
    return codedBands;
 }
 

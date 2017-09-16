@@ -1,39 +1,15 @@
-#ifndef OPUSENC_CONFIG_H
-#define OPUSENC_CONFIG_H
-
-#define OUTSIDE_SPEEX 1
-#define RANDOM_PREFIX AB23
-#define FLOATING_POINT 1
-/* Disable floating-point API */
-/* #undef OP_DISABLE_FLOAT_API */
-/* Enable assertions in code */
-/* #undef OP_ENABLE_ASSERTIONS */
-
-/* Enable fixed-point calculation */
-/* #undef OP_FIXED_POINT */
-
-/* Define to 1 if you have the <alloca.h> header file. */
-/* #undef HAVE_ALLOCA_H */
-#define HAVE_ALLOCA_H 1
-
-/* NE10 library is installed on host. Make sure it is on target! */
-/* #undef HAVE_ARM_NE10 */
+/* config.h.  Generated from config.h.in by configure.  */
+/* config.h.in.  Generated from configure.ac by autoheader.  */
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
+/* #undef HAVE_DLFCN_H */
 #define HAVE_DLFCN_H 1
-
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
 
-/* Define to 1 if you have the `lrint' function. */
-#define HAVE_LRINT 1
-
-/* Define to 1 if you have the `lrintf' function. */
-#define HAVE_LRINTF 1
-
 /* Define to 1 if you have the <memory.h> header file. */
+/* #undef HAVE_MEMORY_H */
 #define HAVE_MEMORY_H 1
-
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1
 
@@ -54,108 +30,25 @@
 
 /* Define to 1 if you have the <unistd.h> header file. */
 #define HAVE_UNISTD_H 1
-
-/* Define to 1 if you have the `__malloc_hook' function. */
-/* #undef HAVE___MALLOC_HOOK */
 
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #define LT_OBJDIR ".libs/"
 
-/* Define to 1 if you have the ANSI C header files. */
-#define STDC_HEADERS 1
-
-/* Make use of alloca */
-/* #undef USE_ALLOCA */
-#define USE_ALLOCA 1
-
-/* Use C99 variable-size arrays */
-//#define VAR_ARRAYS 1
-
-
-
-/* 1234 = LIL_ENDIAN, 4321 = BIGENDIAN */
-#define BYTEORDER 1234
-
-/* Define to 1 if you have the `bcopy' function. */
-#define HAVE_BCOPY 1
-
-/* Define to 1 if you have the <dlfcn.h> header file. */
-#define HAVE_DLFCN_H 1
-
-/* Define to 1 if you have the <fcntl.h> header file. */
-#define HAVE_FCNTL_H 1
-
-/* Define to 1 if you have the `getpagesize' function. */
-#define HAVE_GETPAGESIZE 1
-
-/* Define to 1 if you have the <inttypes.h> header file. */
-#define HAVE_INTTYPES_H 1
-
-/* Define to 1 if you have the `memmove' function. */
-#define HAVE_MEMMOVE 1
-
-/* Define to 1 if you have the <memory.h> header file. */
-#define HAVE_MEMORY_H 1
-
-/* Define to 1 if you have a working `mmap' system call. */
-#define HAVE_MMAP 1
-
-#define HAVE_ERRNO_H 1
-
-/* Define to 1 if you have the <stdint.h> header file. */
-#define HAVE_STDINT_H 1
-
-/* Define to 1 if you have the <stdlib.h> header file. */
-#define HAVE_STDLIB_H 1
-
-/* Define to 1 if you have the <strings.h> header file. */
-#define HAVE_STRINGS_H 1
-
-/* Define to 1 if you have the <string.h> header file. */
-#define HAVE_STRING_H 1
-
-/* Define to 1 if you have the <sys/param.h> header file. */
-#define HAVE_SYS_PARAM_H 1
-
-/* Define to 1 if you have the <sys/stat.h> header file. */
-#define HAVE_SYS_STAT_H 1
-
-/* Define to 1 if you have the <sys/types.h> header file. */
-#define HAVE_SYS_TYPES_H 1
-
-/* Define to 1 if you have the <unistd.h> header file. */
-#define HAVE_UNISTD_H 1
-
-/* Define to the sub-directory in which libtool stores uninstalled libraries.
-   */
-#define LT_OBJDIR ".libs/"
-
-
-/* Define to 1 if you have the ANSI C header files. */
-#define STDC_HEADERS 1
-
-/* whether byteorder is bigendian */
-/* #undef WORDS_BIGENDIAN */
-
-
-
-/* Define to __FUNCTION__ or "" if `__func__' does not conform to ANSI C. */
-/* #undef __func__ */
-
-/* Define to empty if `const' does not conform to ANSI C. */
-/* #undef const */
-
-/* Define to `long int' if <sys/types.h> does not define. */
-/* #undef off_t */
-
-/* Define to `unsigned int' if <sys/types.h> does not define. */
-/* #undef size_t */
-
-
 /* This is a build of libopusenc */
 #define OPE_BUILD /**/
 
+/* Disable floating-point API */
+//#define OP_DISABLE_FLOAT_API 1
 
+/* Enable assertions in code */
+/* #undef OP_ENABLE_ASSERTIONS */
+
+/* Enable fixed-point calculation */
+#define OP_FIXED_POINT 1
+
+/* Enable use of lrintf function */
+/* #undef OP_HAVE_LRINTF */
+#define OP_HAVE_LRINTF 1
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT "opus@xiph.org"
 
@@ -210,4 +103,32 @@
 #endif
 
 
+/* Enable large inode numbers on Mac OS X 10.5.  */
+#ifndef _DARWIN_USE_64_BIT_INODE
+# define _DARWIN_USE_64_BIT_INODE 1
+#endif
+
+/* Number of bits in a file offset, on hosts where this is settable. */
+/* #undef _FILE_OFFSET_BITS */
+
+/* Define for large files, on AIX-style hosts. */
+/* #undef _LARGE_FILES */
+
+/* Define to 1 if on MINIX. */
+/* #undef _MINIX */
+
+/* Define to 2 if the system does not provide POSIX.1 features except with
+   this defined. */
+/* #undef _POSIX_1_SOURCE */
+
+/* Define to 1 if you need to in order for `stat' and other things to work. */
+/* #undef _POSIX_SOURCE */
+
+/* We need at least WindowsXP for getaddrinfo/freeaddrinfo */
+/* #undef _WIN32_WINNT */
+
+/* Define to `__inline__' or `__inline' if that's what the C compiler
+   calls it, or to nothing if 'inline' is not supported under any name.  */
+#ifndef __cplusplus
+/* #undef inline */
 #endif

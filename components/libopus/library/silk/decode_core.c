@@ -55,10 +55,10 @@ void silk_decode_core(
 
     silk_assert( psDec->prev_gain_Q16 != 0 );
 
-    AESP32( sLTP, psDec->ltp_mem_length, opus_int16 );
-    AESP32( sLTP_Q15, psDec->ltp_mem_length + psDec->frame_length, opus_int32 );
-    AESP32( res_Q14, psDec->subfr_length, opus_int32 );
-    AESP32( sLPC_Q14, psDec->subfr_length + MAX_LPC_ORDER, opus_int32 );
+    ALLOC( sLTP, psDec->ltp_mem_length, opus_int16 );
+    ALLOC( sLTP_Q15, psDec->ltp_mem_length + psDec->frame_length, opus_int32 );
+    ALLOC( res_Q14, psDec->subfr_length, opus_int32 );
+    ALLOC( sLPC_Q14, psDec->subfr_length + MAX_LPC_ORDER, opus_int32 );
 
     offset_Q10 = silk_Quantization_Offsets_Q10[ psDec->indices.signalType >> 1 ][ psDec->indices.quantOffsetType ];
 
@@ -225,8 +225,6 @@ void silk_decode_core(
             pxq[ i ] = (opus_int16)silk_SAT16( silk_RSHIFT_ROUND( silk_SMULWW( sLPC_Q14[ MAX_LPC_ORDER + i ], Gain_Q10 ), 8 ) );
         }
 
-        /* DEBUG_STORE_DATA( dec.pcm, pxq, psDec->subfr_length * sizeof( opus_int16 ) ) */
-
         /* Update LPC filter state */
         silk_memcpy( sLPC_Q14, &sLPC_Q14[ psDec->subfr_length ], MAX_LPC_ORDER * sizeof( opus_int32 ) );
         pexc_Q14 += psDec->subfr_length;
@@ -236,8 +234,4 @@ void silk_decode_core(
     /* Save LPC state */
     silk_memcpy( psDec->sLPC_Q14_buf, sLPC_Q14, MAX_LPC_ORDER * sizeof( opus_int32 ) );
     RESTORE_STACK;
-    free(sLTP);
-    free(sLTP_Q15);
-    free(res_Q14);
-    free(sLPC_Q14);
 }
